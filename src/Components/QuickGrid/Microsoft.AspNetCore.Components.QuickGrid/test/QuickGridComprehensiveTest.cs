@@ -911,6 +911,36 @@ public class QuickGridComprehensiveTest
     }
 
     [Fact]
+    public void QuickGrid_AdditionalAttributes_CanBeSet()
+    {
+        // Arrange
+        var grid = new QuickGrid<TestEntity>();
+        var attributes = new Dictionary<string, object>
+        {
+            { "data-testid", "quick-grid" },
+            { "role", "grid" }
+        };
+
+        // Act
+        grid.AdditionalAttributes = attributes;
+
+        // Assert
+        Assert.NotNull(grid.AdditionalAttributes);
+        Assert.Equal("quick-grid", grid.AdditionalAttributes["data-testid"]);
+        Assert.Equal("grid", grid.AdditionalAttributes["role"]);
+    }
+
+    [Fact]
+    public void QuickGrid_AdditionalAttributes_DefaultIsNull()
+    {
+        // Arrange & Act
+        var grid = new QuickGrid<TestEntity>();
+
+        // Assert
+        Assert.Null(grid.AdditionalAttributes);
+    }
+
+    [Fact]
     public void QuickGrid_QueryParameterNamePrefix_DefaultIsEmpty()
     {
         // Arrange & Act
