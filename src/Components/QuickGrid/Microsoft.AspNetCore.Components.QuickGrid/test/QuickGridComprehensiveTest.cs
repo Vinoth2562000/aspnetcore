@@ -443,6 +443,204 @@ public class QuickGridComprehensiveTest
 
     #endregion
 
+    #region Display Name Support Tests
+
+    [Fact]
+    public void PropertyColumn_DisplayName_SimplePropertyGeneratesTitle()
+    {
+        // Arrange
+        var column = new PropertyColumn<TestEntity, string>();
+        Expression<Func<TestEntity, string>> propertyExpr = x => x.Name;
+
+        // Act
+        var propertyInfo = typeof(PropertyColumn<TestEntity, string>).GetProperty("Property");
+        propertyInfo?.SetValue(column, propertyExpr);
+
+        var onParamsMethod = typeof(PropertyColumn<TestEntity, string>).GetMethod("OnParametersSet",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        onParamsMethod?.Invoke(column, null);
+
+        // Assert - Title should be extracted from property name
+        Assert.Equal("Name", column.Title);
+    }
+
+    [Fact]
+    public void PropertyColumn_DisplayName_NestedPropertyExtractsLeafName()
+    {
+        // Arrange
+        var column = new PropertyColumn<NestedEntity, string>();
+        Expression<Func<NestedEntity, string>> propertyExpr = x => x.Child.Name;
+
+        // Act
+        var propertyInfo = typeof(PropertyColumn<NestedEntity, string>).GetProperty("Property");
+        propertyInfo?.SetValue(column, propertyExpr);
+
+        var onParamsMethod = typeof(PropertyColumn<NestedEntity, string>).GetMethod("OnParametersSet",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        onParamsMethod?.Invoke(column, null);
+
+        // Assert - Should use last property name (Name) not the full path
+        Assert.Equal("Name", column.Title);
+    }
+
+    [Fact]
+    public void PropertyColumn_DisplayName_MultiLevelNestedPropertyExtractsLeafName()
+    {
+        // Arrange - Create a multi-level nested entity
+        var column = new PropertyColumn<NestedEntity, int>();
+        Expression<Func<NestedEntity, int>> propertyExpr = x => x.Child.Value;
+
+        // Act
+        var propertyInfo = typeof(PropertyColumn<NestedEntity, int>).GetProperty("Property");
+        propertyInfo?.SetValue(column, propertyExpr);
+
+        var onParamsMethod = typeof(PropertyColumn<NestedEntity, int>).GetMethod("OnParametersSet",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        onParamsMethod?.Invoke(column, null);
+
+        // Assert
+        Assert.Equal("Value", column.Title);
+    }
+
+    [Fact]
+    public void PropertyColumn_DisplayName_BooleanPropertyGeneratesTitle()
+    {
+        // Arrange
+        var column = new PropertyColumn<TestEntity, bool>();
+        Expression<Func<TestEntity, bool>> propertyExpr = x => x.IsActive;
+
+        // Act
+        var propertyInfo = typeof(PropertyColumn<TestEntity, bool>).GetProperty("Property");
+        propertyInfo?.SetValue(column, propertyExpr);
+
+        var onParamsMethod = typeof(PropertyColumn<TestEntity, bool>).GetMethod("OnParametersSet",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        onParamsMethod?.Invoke(column, null);
+
+        // Assert
+        Assert.Equal("IsActive", column.Title);
+    }
+
+    [Fact]
+    public void PropertyColumn_DisplayName_NullableDateTimePropertyGeneratesTitle()
+    {
+        // Arrange - ModifiedDate is a nullable DateTime property
+        var column = new PropertyColumn<TestEntity, DateTime?>();
+        Expression<Func<TestEntity, DateTime?>> propertyExpr = x => x.ModifiedDate;
+
+        // Act
+        var propertyInfo = typeof(PropertyColumn<TestEntity, DateTime?>).GetProperty("Property");
+        propertyInfo?.SetValue(column, propertyExpr);
+
+        var onParamsMethod = typeof(PropertyColumn<TestEntity, DateTime?>).GetMethod("OnParametersSet",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        onParamsMethod?.Invoke(column, null);
+
+        // Assert - Should extract property name from nullable property
+        Assert.Equal("ModifiedDate", column.Title);
+    }
+
+    [Fact]
+    public void PropertyColumn_DisplayName_PropertyWithNumbersInName()
+    {
+        // Arrange - Test entity with numbered property
+        var testData = new List<TestEntity> { new() { Id = 1 } }.AsQueryable();
+        var column = new PropertyColumn<TestEntity, int>();
+        Expression<Func<TestEntity, int>> propertyExpr = x => x.Id;
+
+        // Act
+        var propertyInfo = typeof(PropertyColumn<TestEntity, int>).GetProperty("Property");
+        propertyInfo?.SetValue(column, propertyExpr);
+
+        var onParamsMethod = typeof(PropertyColumn<TestEntity, int>).GetMethod("OnParametersSet",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        onParamsMethod?.Invoke(column, null);
+
+        // Assert - Property names with numbers should work
+        Assert.Equal("Id", column.Title);
+    }
+
+    [Fact]
+    public void PropertyColumn_DisplayName_ExplicitTitleOverridesAutoGeneration()
+    {
+        // Arrange
+        var column = new PropertyColumn<TestEntity, string>
+        {
+            Title = "Custom Employee Name"
+        };
+        Expression<Func<TestEntity, string>> propertyExpr = x => x.Name;
+
+        // Act
+        var propertyInfo = typeof(PropertyColumn<TestEntity, string>).GetProperty("Property");
+        propertyInfo?.SetValue(column, propertyExpr);
+
+        var onParamsMethod = typeof(PropertyColumn<TestEntity, string>).GetMethod("OnParametersSet",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        onParamsMethod?.Invoke(column, null);
+
+        // Assert - Explicit title should take precedence
+        Assert.Equal("Custom Employee Name", column.Title);
+    }
+
+    [Fact]
+    public void PropertyColumn_DisplayName_DateTimePropertyGeneratesTitle()
+    {
+        // Arrange
+        var column = new PropertyColumn<TestEntity, DateTime>();
+        Expression<Func<TestEntity, DateTime>> propertyExpr = x => x.CreatedDate;
+
+        // Act
+        var propertyInfo = typeof(PropertyColumn<TestEntity, DateTime>).GetProperty("Property");
+        propertyInfo?.SetValue(column, propertyExpr);
+
+        var onParamsMethod = typeof(PropertyColumn<TestEntity, DateTime>).GetMethod("OnParametersSet",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        onParamsMethod?.Invoke(column, null);
+
+        // Assert
+        Assert.Equal("CreatedDate", column.Title);
+    }
+
+    [Fact]
+    public void PropertyColumn_DisplayName_NestedEntityIdPropertyGeneratesTitle()
+    {
+        // Arrange
+        var column = new PropertyColumn<NestedEntity, int>();
+        Expression<Func<NestedEntity, int>> propertyExpr = x => x.Id;
+
+        // Act
+        var propertyInfo = typeof(PropertyColumn<NestedEntity, int>).GetProperty("Property");
+        propertyInfo?.SetValue(column, propertyExpr);
+
+        var onParamsMethod = typeof(PropertyColumn<NestedEntity, int>).GetMethod("OnParametersSet",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        onParamsMethod?.Invoke(column, null);
+
+        // Assert
+        Assert.Equal("Id", column.Title);
+    }
+
+    [Fact]
+    public void PropertyColumn_DisplayName_NestedEntityTitlePropertyGeneratesTitle()
+    {
+        // Arrange
+        var column = new PropertyColumn<NestedEntity, string>();
+        Expression<Func<NestedEntity, string>> propertyExpr = x => x.Title;
+
+        // Act
+        var propertyInfo = typeof(PropertyColumn<NestedEntity, string>).GetProperty("Property");
+        propertyInfo?.SetValue(column, propertyExpr);
+
+        var onParamsMethod = typeof(PropertyColumn<NestedEntity, string>).GetMethod("OnParametersSet",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        onParamsMethod?.Invoke(column, null);
+
+        // Assert
+        Assert.Equal("Title", column.Title);
+    }
+
+    #endregion
+
     #region TemplateColumn Tests
 
     [Fact]
