@@ -134,11 +134,11 @@ public class GridSortTest
 
         // Assert
         Assert.Equal(2, propertyList.Count);
-        
+
         var firstProperty = propertyList.First();
         Assert.Equal("Name", firstProperty.PropertyName);
         Assert.Equal(SortDirection.Ascending, firstProperty.Direction);
-        
+
         var secondProperty = propertyList.Last();
         Assert.Equal("NullableDate", secondProperty.PropertyName);
         Assert.Equal(SortDirection.Descending, secondProperty.Direction);
@@ -178,5 +178,209 @@ public class GridSortTest
         var gridSort = GridSort<TestEntity>.ByAscending(invalidExpression);
         var exception = Assert.Throws<ArgumentException>(() => gridSort.ToPropertyList(ascending: true));
         Assert.Contains("The supplied expression can't be represented as a property name for sorting", exception.Message);
+    }
+
+    [Fact]
+    public void ToPropertyList_CachesAscendingAndDescendingSeparately()
+    {
+        Expression<Func<TestEntity, string>> first = x => x.Name;
+        Expression<Func<TestEntity, int?>> second = x => x.NullableInt;
+
+        var gridSort = GridSort<TestEntity>.ByAscending(first).ThenDescending(second);
+
+        var asc1 = gridSort.ToPropertyList(ascending: true);
+        var asc2 = gridSort.ToPropertyList(ascending: true);
+        var desc1 = gridSort.ToPropertyList(ascending: false);
+        var desc2 = gridSort.ToPropertyList(ascending: false);
+
+        Assert.Same(asc1, asc2);
+        Assert.Same(desc1, desc2);
+        Assert.NotSame(asc1, desc1);
+    }
+
+    [Fact]
+    public void ByAscending_Apply_SortsAscendingWhenRequested()
+    {
+        // Arrange
+        Expression<Func<TestEntity, string>> expression = x => x.Name;
+        var gridSort = GridSort<TestEntity>.ByAscending(expression);
+        IQueryable<TestEntity> data = new List<TestEntity>
+        {
+            new() { Name = "Charlie" },
+            new() { Name = "Alice" },
+            new() { Name = "Bob" }
+        }.AsQueryable();
+
+        // Act
+        var result = gridSort.Apply(data, ascending: true);
+        var orderedList = result.ToList();
+
+        // Assert
+        Assert.Equal("Alice", orderedList[0].Name);
+        Assert.Equal("Bob", orderedList[1].Name);
+        Assert.Equal("Charlie", orderedList[2].Name);
+    }
+
+    [Fact]
+    public void ByDescending_Apply_SortsDescendingWhenRequested()
+    {
+        // Arrange
+        Expression<Func<TestEntity, string>> expression = x => x.Name;
+        var gridSort = GridSort<TestEntity>.ByDescending(expression);
+        IQueryable<TestEntity> data = new List<TestEntity>
+        {
+            new() { Name = "Charlie" },
+            new() { Name = "Alice" },
+            new() { Name = "Bob" }
+        }.AsQueryable();
+
+        // Act
+        var result = gridSort.Apply(data, ascending: true);
+        var orderedList = result.ToList();
+
+        // Assert
+        Assert.Equal("Charlie", orderedList[0].Name);
+        Assert.Equal("Bob", orderedList[1].Name);
+        Assert.Equal("Alice", orderedList[2].Name);
+    }
+
+    [Fact]
+    public void ByAscending_ThenAscending_ChainsSortClauses()
+    {
+        // Arrange
+        Expression<Func<TestEntity, int>> firstExpression = x => x.Age;
+        Expression<Func<TestEntity, string>> secondExpression = x => x.Name;
+        var gridSort = GridSort<TestEntity>.ByAscending(firstExpression).ThenAscending(secondExpression);
+        IQueryable<TestEntity> data = new List<TestEntity>
+        {
+            new() { Age = 30, Name = "Bob" },
+            new() { Age = 25, Name = "Alice" },
+            new() { Age = 30, Name = "Alice" },
+            new() { Age = 25, Name = "Bob" }
+        }.AsQueryable();
+
+        // Act
+        var result = gridSort.Apply(data, ascending: true);
+        var orderedList = result.ToList();
+
+        // Assert - Primary: Age ascending, Secondary: Name ascending
+        Assert.Equal(25, orderedList[0].Age);
+        Assert.Equal("Alice", orderedList[0].Name);
+        Assert.Equal(25, orderedList[1].Age);
+        Assert.Equal("Bob", orderedList[1].Name);
+        Assert.Equal(30, orderedList[2].Age);
+        Assert.Equal("Alice", orderedList[2].Name);
+        Assert.Equal(30, orderedList[3].Age);
+        Assert.Equal("Bob", orderedList[3].Name);
+    }
+
+    [Fact]
+    public void ByAscending_ThenDescending_InvertsSecondaryDirection()
+    {
+        // Arrange
+        Expression<Func<TestEntity, int>> firstExpression = x => x.Age;
+        Expression<Func<TestEntity, string>> secondExpression = x => x.Name;
+        var gridSort = GridSort<TestEntity>.ByAscending(firstExpression).ThenDescending(secondExpression);
+        IQueryable<TestEntity> data = new List<TestEntity>
+        {
+            new() { Age = 30, Name = "Bob" },
+            new() { Age = 25, Name = "Alice" },
+            new() { Age = 30, Name = "Alice" },
+            new() { Age = 25, Name = "Bob" }
+        }.AsQueryable();
+
+        // Act
+        var result = gridSort.Apply(data, ascending: true);
+        var orderedList = result.ToList();
+
+        // Assert - Primary: Age ascending, Secondary: Name DESCENDING (inverted)
+        Assert.Equal(25, orderedList[0].Age);
+        Assert.Equal("Bob", orderedList[0].Name); // Alice first if asc, but we said desc
+        Assert.Equal(25, orderedList[1].Age);
+        Assert.Equal("Alice", orderedList[1].Name);
+        Assert.Equal(30, orderedList[2].Age);
+        Assert.Equal("Bob", orderedList[2].Name);
+        Assert.Equal(30, orderedList[3].Age);
+        Assert.Equal("Alice", orderedList[3].Name);
+    }
+
+    [Fact]
+    public void ToPropertyList_CachesAscendingResults()
+    {
+        // Arrange
+        Expression<Func<TestEntity, string>> expression = x => x.Name;
+        var gridSort = GridSort<TestEntity>.ByAscending(expression);
+
+        // Act - call twice
+        var firstCall = gridSort.ToPropertyList(ascending: true);
+        var secondCall = gridSort.ToPropertyList(ascending: true);
+
+        // Assert - should be same reference (cached)
+        Assert.Same(firstCall, secondCall);
+    }
+
+    [Fact]
+    public void ToPropertyList_CachesDescendingResultsSeparately()
+    {
+        // Arrange
+        Expression<Func<TestEntity, string>> expression = x => x.Name;
+        var gridSort = GridSort<TestEntity>.ByAscending(expression);
+
+        // Act
+        var ascendingResult = gridSort.ToPropertyList(ascending: true);
+        var descendingResult = gridSort.ToPropertyList(ascending: false);
+
+        // Assert - different references, different content
+        Assert.NotSame(ascendingResult, descendingResult);
+        Assert.Equal(SortDirection.Ascending, ascendingResult.First().Direction);
+        Assert.Equal(SortDirection.Descending, descendingResult.First().Direction);
+    }
+
+    [Fact]
+    public void Apply_WithDescendingInitialSort_AppliesCorrectly()
+    {
+        // Arrange
+        Expression<Func<TestEntity, string>> expression = x => x.Name;
+        var gridSort = GridSort<TestEntity>.ByDescending(expression);
+        IQueryable<TestEntity> data = new List<TestEntity>
+        {
+            new() { Name = "Charlie" },
+            new() { Name = "Alice" },
+            new() { Name = "Bob" }
+        }.AsQueryable();
+
+        // Act - apply with ascending=true (should flip to descending because initial is desc)
+        var result = gridSort.Apply(data, ascending: true);
+        var orderedList = result.ToList();
+
+        // Assert - flipped: desc first (initial was desc, so asc=true flips it)
+        Assert.Equal("Charlie", orderedList[0].Name);
+    }
+
+    [Fact]
+    public void Apply_WithChainedThenBy_CreatesCorrectlyOrderedQuery()
+    {
+        // Arrange
+        Expression<Func<TestEntity, int>> ageExpr = x => x.Age;
+        Expression<Func<TestEntity, string>> nameExpr = x => x.Name;
+        var gridSort = GridSort<TestEntity>.ByAscending(ageExpr).ThenDescending(nameExpr);
+        IQueryable<TestEntity> data = new List<TestEntity>
+        {
+            new() { Age = 30, Name = "Bob" },
+            new() { Age = 25, Name = "Bob" },
+            new() { Age = 30, Name = "Alice" },
+            new() { Age = 25, Name = "Alice" }
+        }.AsQueryable();
+
+        // Act
+        var result = gridSort.Apply(data, ascending: true);
+        var orderedList = result.ToList();
+
+        // Assert
+        // Age ascending first (25, 25, 30, 30), then Name descending within each age (Bob before Alice)
+        Assert.Equal(25, orderedList[0].Age); Assert.Equal("Bob", orderedList[0].Name);
+        Assert.Equal(25, orderedList[1].Age); Assert.Equal("Alice", orderedList[1].Name);
+        Assert.Equal(30, orderedList[2].Age); Assert.Equal("Bob", orderedList[2].Name);
+        Assert.Equal(30, orderedList[3].Age); Assert.Equal("Alice", orderedList[3].Name);
     }
 }
