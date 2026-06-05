@@ -250,7 +250,7 @@ public class PropertyColumnTest
     }
 
     [Fact]
-    public void PropertyColumn_DefaultSort_IsSortableByDefault()
+    public void PropertyColumn_DefaultSort_IsNotSortable()
     {
         // Arrange
         var column = new PropertyColumn<TestEntity, string>();

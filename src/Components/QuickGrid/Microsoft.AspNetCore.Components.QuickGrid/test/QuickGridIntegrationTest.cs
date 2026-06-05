@@ -22,15 +22,60 @@ public class QuickGridIntegrationTest
         // Arrange
         var grid = new QuickGrid<TestEntity>();
         var items = new List<TestEntity> { new TestEntity { Name = "Test", Age = 25 } }.AsQueryable();
-        GridItemsProvider<TestEntity> itemsProvider = null!; // ItemsProvider is a delegate, not a class
+        GridItemsProvider<TestEntity> itemsProvider = _ => ValueTask.FromResult(GridItemsProviderResult.From<TestEntity>(Array.Empty<TestEntity>(), 0));
 
-        // Act - set both Items and ItemsProvider
+        // Act & Assert - the conflict is detected when OnParametersSetAsync is called
+        // We use a separate try-catch because reflection wraps exceptions
         grid.Items = items;
         grid.ItemsProvider = itemsProvider;
 
-        // Assert - verifying both properties are set as expected
-        Assert.NotNull(grid.Items);
-        Assert.Null(grid.ItemsProvider);
+        var method = typeof(QuickGrid<TestEntity>).GetMethod("OnParametersSetAsync", BindingFlags.NonPublic | BindingFlags.Instance);
+        Assert.NotNull(method);
+
+        Exception? actualException = null;
+        try
+        {
+            method.Invoke(grid, null);
+        }
+        catch (Exception ex)
+        {
+            actualException = ex.InnerException ?? ex;
+        }
+
+        Assert.NotNull(actualException);
+        var ioe = Assert.IsType<InvalidOperationException>(actualException);
+        Assert.Contains("Items", ioe.Message);
+        Assert.Contains("ItemsProvider", ioe.Message);
+    }
+
+    [Fact]
+    public void QuickGrid_ItemsAndItemsProvider_BothSet_ConflictMessage()
+    {
+        // Arrange
+        var grid = new QuickGrid<TestEntity>();
+        var items = new List<TestEntity> { new TestEntity { Name = "Test", Age = 25 } }.AsQueryable();
+        GridItemsProvider<TestEntity> itemsProvider = _ => ValueTask.FromResult(GridItemsProviderResult.From<TestEntity>(Array.Empty<TestEntity>(), 0));
+
+        // Act & Assert - exception message should indicate mutual exclusivity
+        grid.Items = items;
+        grid.ItemsProvider = itemsProvider;
+
+        var method = typeof(QuickGrid<TestEntity>).GetMethod("OnParametersSetAsync", BindingFlags.NonPublic | BindingFlags.Instance);
+        Assert.NotNull(method);
+
+        Exception? actualException = null;
+        try
+        {
+            method.Invoke(grid, null);
+        }
+        catch (Exception ex)
+        {
+            actualException = ex.InnerException ?? ex;
+        }
+
+        Assert.NotNull(actualException);
+        var ioe = Assert.IsType<InvalidOperationException>(actualException);
+        Assert.Contains("both were specified", ioe.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

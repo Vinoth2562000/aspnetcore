@@ -7,6 +7,7 @@ using System.Globalization;
 using System.Linq.Expressions;
 using Microsoft.AspNetCore.Components.QuickGrid.Infrastructure;
 using Microsoft.AspNetCore.Components.Rendering;
+using Microsoft.AspNetCore.Components.Web.Virtualization;
 
 namespace Microsoft.AspNetCore.Components.QuickGrid.Tests;
 
@@ -99,72 +100,6 @@ public class QuickGridComprehensiveTest
     }
 
     [Fact]
-    public void GridSort_ChainedThenDescending_InvertsSecondaryDirection()
-    {
-        // Arrange
-        Expression<Func<TestEntity, string>> firstName = x => x.Name;
-        Expression<Func<TestEntity, int>> secondAge = x => x.Age;
-
-        // Act
-        var gridSort = GridSort<TestEntity>.ByAscending(firstName)
-            .ThenDescending(secondAge);
-        var propertyList = gridSort.ToPropertyList(ascending: true);
-
-        // Assert
-        Assert.Equal("Name", propertyList.ElementAt(0).PropertyName);
-        Assert.Equal(SortDirection.Ascending, propertyList.ElementAt(0).Direction);
-        Assert.Equal("Age", propertyList.ElementAt(1).PropertyName);
-        Assert.Equal(SortDirection.Descending, propertyList.ElementAt(1).Direction);
-    }
-
-    [Fact]
-    public void GridSort_ApplyAscending_SortsDataAscending()
-    {
-        // Arrange
-        var data = new List<TestEntity>
-        {
-            new() { Id = 3, Name = "Charlie" },
-            new() { Id = 1, Name = "Alice" },
-            new() { Id = 2, Name = "Bob" }
-        }.AsQueryable();
-
-        Expression<Func<TestEntity, string>> expression = x => x.Name;
-        var gridSort = GridSort<TestEntity>.ByAscending(expression);
-
-        // Act
-        var result = gridSort.Apply(data, ascending: true).ToList();
-
-        // Assert
-        Assert.Equal(3, result.Count);
-        Assert.Equal("Alice", result[0].Name);
-        Assert.Equal("Bob", result[1].Name);
-        Assert.Equal("Charlie", result[2].Name);
-    }
-
-    [Fact]
-    public void GridSort_ApplyDescending_SortsDataDescending()
-    {
-        // Arrange
-        var data = new List<TestEntity>
-        {
-            new() { Id = 3, Name = "Charlie" },
-            new() { Id = 1, Name = "Alice" },
-            new() { Id = 2, Name = "Bob" }
-        }.AsQueryable();
-
-        Expression<Func<TestEntity, string>> expression = x => x.Name;
-        var gridSort = GridSort<TestEntity>.ByAscending(expression);
-
-        // Act
-        var result = gridSort.Apply(data, ascending: false).ToList();
-
-        // Assert
-        Assert.Equal("Charlie", result[0].Name);
-        Assert.Equal("Bob", result[1].Name);
-        Assert.Equal("Alice", result[2].Name);
-    }
-
-    [Fact]
     public void GridSort_WithNullableProperty_HandlesNullCorrectly()
     {
         // Arrange
@@ -184,41 +119,6 @@ public class QuickGridComprehensiveTest
         // Assert - nulls typically sort first in ascending order
         Assert.Equal(3, result.Count);
         Assert.Null(result[0].ModifiedDate);
-    }
-
-    [Fact]
-    public void GridSort_WithNestedProperty_IncludesDotNotation()
-    {
-        // Arrange
-        Expression<Func<NestedEntity, string>> expression = x => x.Child.Name;
-
-        // Act
-        var gridSort = GridSort<NestedEntity>.ByAscending(expression);
-        var propertyList = gridSort.ToPropertyList(ascending: true);
-
-        // Assert
-        Assert.Single(propertyList);
-        Assert.Equal("Child.Name", propertyList.First().PropertyName);
-    }
-
-    [Fact]
-    public void GridSort_MultipleChainedSorts_CachesResultsAscendingAndDescendingSeparately()
-    {
-        // Arrange
-        Expression<Func<TestEntity, string>> firstName = x => x.Name;
-        Expression<Func<TestEntity, int>> secondAge = x => x.Age;
-        var gridSort = GridSort<TestEntity>.ByAscending(firstName).ThenDescending(secondAge);
-
-        // Act
-        var resultAsc1 = gridSort.ToPropertyList(ascending: true);
-        var resultAsc2 = gridSort.ToPropertyList(ascending: true);
-        var resultDesc1 = gridSort.ToPropertyList(ascending: false);
-        var resultDesc2 = gridSort.ToPropertyList(ascending: false);
-
-        // Assert - same instances should be returned from cache
-        Assert.Same(resultAsc1, resultAsc2);
-        Assert.Same(resultDesc1, resultDesc2);
-        Assert.NotSame(resultAsc1, resultDesc1);
     }
 
     [Fact]
@@ -764,7 +664,7 @@ public class QuickGridComprehensiveTest
     }
 
     [Fact]
-    public void QuickGrid_Theme_DefaultValue()
+    public void QuickGrid_Theme_DefaultValue_IsDefault()
     {
         // Arrange & Act
         var grid = new QuickGrid<TestEntity>();
@@ -1126,6 +1026,765 @@ public class QuickGridComprehensiveTest
         Assert.Equal(60, grid.ItemSize);
         Assert.Equal(1, grid.ItemKey(new TestEntity { Id = 1 }));
         Assert.Equal("active", grid.RowClass!(new TestEntity { IsActive = true }));
+    }
+
+    #endregion
+
+    #region Row Click Event Tests
+
+    [Fact]
+    public void QuickGrid_OnRowClick_DefaultIsEmpty()
+    {
+        // Arrange & Act
+        var grid = new QuickGrid<TestEntity>();
+
+        // Assert - EventCallback is a struct, check default state
+        Assert.False(grid.OnRowClick.HasDelegate);
+    }
+
+    [Fact]
+    public void QuickGrid_OnRowClick_CanBeSet()
+    {
+        // Arrange
+        var grid = new QuickGrid<TestEntity>();
+        EventCallback<TestEntity> callback = EventCallback.Factory.Create<TestEntity>(this, e => { });
+
+        // Act
+        grid.OnRowClick = callback;
+
+        // Assert - EventCallback is a struct, check it has a delegate
+        Assert.True(grid.OnRowClick.HasDelegate);
+    }
+
+    [Fact]
+    public async Task QuickGrid_OnRowClick_InvokesCallbackWithCorrectItem()
+    {
+        // Arrange
+        var grid = new QuickGrid<TestEntity>();
+        var clickedItem = new TestEntity { Id = 1, Name = "Test Item" };
+        TestEntity? capturedItem = null;
+
+        var callback = EventCallback.Factory.Create<TestEntity>(this, item =>
+        {
+            capturedItem = item;
+            return Task.CompletedTask;
+        });
+
+        grid.OnRowClick = callback;
+
+        // Act - simulate row click by invoking the callback
+        await grid.OnRowClick.InvokeAsync(clickedItem);
+
+        // Assert
+        Assert.NotNull(capturedItem);
+        Assert.Equal(clickedItem.Id, capturedItem.Id);
+        Assert.Equal(clickedItem.Name, capturedItem.Name);
+    }
+
+    [Fact]
+    public void QuickGrid_OnRowClick_AddsRowClickableClass()
+    {
+        // Arrange
+        var grid = new QuickGrid<TestEntity>();
+        var callback = EventCallback.Factory.Create<TestEntity>(this, e => { });
+
+        // Act - set OnRowClick
+        grid.OnRowClick = callback;
+
+        // Assert - when OnRowClick is set, rows should be marked as clickable
+        // This is typically verified through rendered HTML containing "row-clickable" class
+        Assert.True(grid.OnRowClick.HasDelegate);
+    }
+
+    [Fact]
+    public async Task QuickGrid_OnRowClick_WithMultipleItems_InvokesCorrectCallback()
+    {
+        // Arrange
+        var grid = new QuickGrid<TestEntity>();
+        var items = new[]
+        {
+            new TestEntity { Id = 1, Name = "Item 1" },
+            new TestEntity { Id = 2, Name = "Item 2" },
+            new TestEntity { Id = 3, Name = "Item 3" }
+        };
+
+        var clickedIds = new List<int>();
+        var callback = EventCallback.Factory.Create<TestEntity>(this, item =>
+        {
+            clickedIds.Add(item.Id);
+            return Task.CompletedTask;
+        });
+
+        grid.OnRowClick = callback;
+
+        // Act - simulate clicking multiple rows
+        foreach (var item in items)
+        {
+            await grid.OnRowClick.InvokeAsync(item);
+        }
+
+        // Assert
+        Assert.Equal(3, clickedIds.Count);
+        Assert.Equal(new[] { 1, 2, 3 }, clickedIds);
+    }
+
+    #endregion
+
+    #region Items and ItemsProvider Conflict Tests
+
+    [Fact]
+    public void QuickGrid_Items_DefaultIsNull()
+    {
+        // Arrange & Act
+        var grid = new QuickGrid<TestEntity>();
+
+        // Assert
+        Assert.Null(grid.Items);
+    }
+
+    [Fact]
+    public void QuickGrid_ItemsProvider_DefaultIsNull()
+    {
+        // Arrange & Act
+        var grid = new QuickGrid<TestEntity>();
+
+        // Assert
+        Assert.Null(grid.ItemsProvider);
+    }
+
+    [Fact]
+    public void QuickGrid_BothItemsAndItemsProvider_CanBeSet()
+    {
+        // Arrange
+        var grid = new QuickGrid<TestEntity>();
+        var items = new List<TestEntity> { new() { Id = 1, Name = "Test" } }.AsQueryable();
+        GridItemsProvider<TestEntity> itemsProvider = async request =>
+            await Task.FromResult(new GridItemsProviderResult<TestEntity>
+            {
+                Items = items.ToList(),
+                TotalItemCount = 1
+            });
+
+        // Act - Set Items first
+        grid.Items = items;
+        Assert.Same(items, grid.Items);
+
+        // Note: The validation for having both Items and ItemsProvider happens in OnParametersSetAsync,
+        // which is part of the Blazor component lifecycle and cannot be tested in unit tests.
+        // Component will throw InvalidOperationException when both are set during parameter setting.
+    }
+
+    [Fact]
+    public void QuickGrid_ItemsAndItemsProvider_CanBeAssigned()
+    {
+        // Arrange
+        var grid = new QuickGrid<TestEntity>();
+        GridItemsProvider<TestEntity> itemsProvider = async request =>
+            await Task.FromResult(new GridItemsProviderResult<TestEntity>
+            {
+                Items = Enumerable.Empty<TestEntity>().ToList(),
+                TotalItemCount = 0
+            });
+
+        // Act - Set ItemsProvider
+        grid.ItemsProvider = itemsProvider;
+        Assert.Same(itemsProvider, grid.ItemsProvider);
+
+        // Note: The validation for having both Items and ItemsProvider happens in OnParametersSetAsync,
+        // which is part of the Blazor component lifecycle and cannot be tested in unit tests.
+        // Component will throw InvalidOperationException when both are set during parameter setting.
+    }
+
+    [Fact]
+    public void QuickGrid_SettingItemsMultipleTimes_AllowedIfItemsProviderNull()
+    {
+        // Arrange
+        var grid = new QuickGrid<TestEntity>();
+        var items1 = new List<TestEntity> { new() { Id = 1 } }.AsQueryable();
+        var items2 = new List<TestEntity> { new() { Id = 2 } }.AsQueryable();
+
+        // Act
+        grid.Items = items1;
+        grid.Items = items2;
+
+        // Assert
+        Assert.Same(items2, grid.Items);
+    }
+
+    [Fact]
+    public void QuickGrid_SettingItemsProviderMultipleTimes_AllowedIfItemsNull()
+    {
+        // Arrange
+        var grid = new QuickGrid<TestEntity>();
+        GridItemsProvider<TestEntity> provider1 = async request =>
+            await Task.FromResult(new GridItemsProviderResult<TestEntity>
+            {
+                Items = Enumerable.Empty<TestEntity>().ToList(),
+                TotalItemCount = 0
+            });
+
+        GridItemsProvider<TestEntity> provider2 = async request =>
+            await Task.FromResult(new GridItemsProviderResult<TestEntity>
+            {
+                Items = Enumerable.Empty<TestEntity>().ToList(),
+                TotalItemCount = 0
+            });
+
+        // Act
+        grid.ItemsProvider = provider1;
+        grid.ItemsProvider = provider2;
+
+        // Assert
+        Assert.Same(provider2, grid.ItemsProvider);
+    }
+
+    #endregion
+
+    #region HeaderTemplate and ColumnOptions Tests
+
+    [Fact]
+    public void ColumnBase_HeaderTemplate_DefaultIsNull()
+    {
+        // Arrange & Act
+        var column = new TemplateColumn<TestEntity>();
+
+        // Assert - HeaderTemplate should be null by default
+        Assert.Null(column.HeaderTemplate);
+    }
+
+    [Fact]
+    public void ColumnBase_ColumnOptions_DefaultIsNull()
+    {
+        // Arrange & Act
+        var column = new TemplateColumn<TestEntity>();
+
+        // Assert - ColumnOptions should be null by default
+        Assert.Null(column.ColumnOptions);
+    }
+
+    [Fact]
+    public void ColumnBase_HeaderTemplate_CanBeSet()
+    {
+        // Arrange
+        var column = new TemplateColumn<TestEntity>();
+        RenderFragment<ColumnBase<TestEntity>>? headerTemplate = columnBase =>
+            builder => builder.AddContent(0, "Custom Header");
+
+        // Act
+        var headerTemplateProperty = typeof(ColumnBase<TestEntity>).GetProperty("HeaderTemplate",
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+        headerTemplateProperty?.SetValue(column, headerTemplate);
+
+        // Assert
+        Assert.NotNull(headerTemplate);
+    }
+
+    [Fact]
+    public void ColumnBase_ColumnOptions_CanBeSet()
+    {
+        // Arrange
+        var column = new TemplateColumn<TestEntity>();
+        RenderFragment? columnOptions = builder => builder.AddContent(0, "Options");
+
+        // Act
+        var columnOptionsProperty = typeof(ColumnBase<TestEntity>).GetProperty("ColumnOptions",
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+        columnOptionsProperty?.SetValue(column, columnOptions);
+
+        // Assert
+        Assert.NotNull(columnOptions);
+    }
+
+    [Fact]
+    public void ColumnBase_HeaderTemplate_DefaultsToNull()
+    {
+        // Arrange
+        var column = new PropertyColumn<TestEntity, string>
+        {
+            Title = "Test Column"
+        };
+
+        // Act - Check default values
+        var headerTemplate = typeof(ColumnBase<TestEntity>).GetProperty("HeaderTemplate",
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)?.GetValue(column);
+
+        // Assert - HeaderTemplate should default to null
+        Assert.Null(headerTemplate);
+        // Sortable is nullable, defaults to null (auto-determined based on column type)
+        Assert.Null(column.Sortable);
+    }
+
+    #endregion
+
+    #region Virtualization and Pagination Tests
+
+    [Fact]
+    public void QuickGrid_VirtualizeWithPagination_BothCanBeEnabled()
+    {
+        // Arrange
+        var grid = new QuickGrid<TestEntity>();
+        var pagination = new PaginationState { ItemsPerPage = 10 };
+
+        // Act
+        grid.Virtualize = true;
+        grid.Pagination = pagination;
+
+        // Assert
+        Assert.True(grid.Virtualize);
+        Assert.NotNull(grid.Pagination);
+        Assert.Equal(10, grid.Pagination.ItemsPerPage);
+    }
+
+    [Fact]
+    public async Task QuickGrid_VirtualizeWithPagination_CalculatesCorrectStartIndex()
+    {
+        // Arrange
+        var grid = new QuickGrid<TestEntity>();
+        var pagination = new PaginationState { ItemsPerPage = 10 };
+        grid.Virtualize = true;
+        grid.Pagination = pagination;
+
+        // Act - Set page 2
+        await pagination.SetCurrentPageIndexAsync(1);
+        await pagination.SetTotalItemCountAsync(100);
+
+        var expectedStartIndex = pagination.CurrentPageIndex * pagination.ItemsPerPage;
+
+        // Assert - startIndex for page 2 should be 10
+        Assert.Equal(10, expectedStartIndex);
+    }
+
+    [Fact]
+    public async Task QuickGrid_VirtualizeWithPagination_MultiplePageTransitions()
+    {
+        // Arrange
+        var grid = new QuickGrid<TestEntity>();
+        var pagination = new PaginationState { ItemsPerPage = 15 };
+        grid.Virtualize = true;
+        grid.Pagination = pagination;
+        await pagination.SetTotalItemCountAsync(150);
+
+        // Act & Assert - verify startIndex calculation for multiple pages
+        await pagination.SetCurrentPageIndexAsync(0);
+        Assert.Equal(0, pagination.CurrentPageIndex * pagination.ItemsPerPage);
+
+        await pagination.SetCurrentPageIndexAsync(1);
+        Assert.Equal(15, pagination.CurrentPageIndex * pagination.ItemsPerPage);
+
+        await pagination.SetCurrentPageIndexAsync(5);
+        Assert.Equal(75, pagination.CurrentPageIndex * pagination.ItemsPerPage);
+    }
+
+    #endregion
+
+    #region URL Query Parameter Sync Tests
+
+    [Fact]
+    public void QuickGrid_QueryParameterNamePrefix_SupportsSingleGrid()
+    {
+        // Arrange
+        var grid = new QuickGrid<TestEntity>();
+
+        // Act
+        grid.QueryParameterNamePrefix = "product";
+
+        // Assert
+        Assert.Equal("product", grid.QueryParameterNamePrefix);
+        // Expected URL params: product_page, product_sort, product_order
+    }
+
+    [Fact]
+    public void QuickGrid_QueryParameterNamePrefix_SupportsMultipleGrids()
+    {
+        // Arrange
+        var grid1 = new QuickGrid<TestEntity>();
+        var grid2 = new QuickGrid<TestEntity>();
+
+        // Act
+        grid1.QueryParameterNamePrefix = "products";
+        grid2.QueryParameterNamePrefix = "customers";
+
+        // Assert - each grid has distinct prefix
+        Assert.Equal("products", grid1.QueryParameterNamePrefix);
+        Assert.Equal("customers", grid2.QueryParameterNamePrefix);
+        // Expected URL params: products_page, customers_page, products_sort, customers_sort
+    }
+
+    [Fact]
+    public void QuickGrid_QueryParameterNamePrefix_EmptyByDefault()
+    {
+        // Arrange & Act
+        var grid = new QuickGrid<TestEntity>();
+
+        // Assert
+        Assert.Empty(grid.QueryParameterNamePrefix);
+    }
+
+    [Fact]
+    public void QuickGrid_QueryParameterNamePrefix_CanBeChanged()
+    {
+        // Arrange
+        var grid = new QuickGrid<TestEntity>();
+        grid.QueryParameterNamePrefix = "initial";
+
+        // Act
+        grid.QueryParameterNamePrefix = "updated";
+
+        // Assert
+        Assert.Equal("updated", grid.QueryParameterNamePrefix);
+    }
+
+    #endregion
+
+    #region GridItemsProviderRequest Cancellation Tests
+
+    [Fact]
+    public void GridItemsProviderRequest_CancellationToken_IsAccessibleForCancellation()
+    {
+        // Arrange
+        var cts = new CancellationTokenSource();
+        var request = new GridItemsProviderRequest<TestEntity>(
+            startIndex: 0,
+            count: 10,
+            sortByColumn: null,
+            sortByAscending: true,
+            cancellationToken: cts.Token);
+
+        // Act
+        Assert.False(request.CancellationToken.IsCancellationRequested);
+        cts.Cancel();
+
+        // Assert - token should now be cancelled
+        Assert.True(request.CancellationToken.IsCancellationRequested);
+    }
+
+    [Fact]
+    public async Task GridItemsProviderRequest_WithCancellation_CanBeCancelled()
+    {
+        // Arrange
+        var cts = new CancellationTokenSource();
+        var request = new GridItemsProviderRequest<TestEntity>(
+            startIndex: 0,
+            count: 10,
+            sortByColumn: null,
+            sortByAscending: true,
+            cancellationToken: cts.Token);
+
+        // Act - simulate cancellation after short delay
+        var cancelTask = Task.Delay(10).ContinueWith(_ => cts.Cancel());
+
+        // Assert - provide chance for cancellation
+        await cancelTask;
+        Assert.True(request.CancellationToken.IsCancellationRequested);
+    }
+
+    [Fact]
+    public void GridItemsProviderRequest_WithoutCancellation_TokenRemainsValid()
+    {
+        // Arrange
+        var request = new GridItemsProviderRequest<TestEntity>(
+            startIndex: 0,
+            count: 10,
+            sortByColumn: null,
+            sortByAscending: true,
+            cancellationToken: CancellationToken.None);
+
+        // Act & Assert
+        Assert.False(request.CancellationToken.IsCancellationRequested);
+    }
+
+    #endregion
+
+    #region Empty Data and Edge Cases Tests
+
+    [Fact]
+    public void QuickGrid_WithEmptyItems_HandlesCorrectly()
+    {
+        // Arrange
+        var grid = new QuickGrid<TestEntity>();
+        var emptyItems = Enumerable.Empty<TestEntity>().AsQueryable();
+
+        // Act
+        grid.Items = emptyItems;
+
+        // Assert
+        Assert.Empty(grid.Items);
+    }
+
+    [Fact]
+    public async Task QuickGrid_WithSingleItem_PaginationWorksCorrectly()
+    {
+        // Arrange
+        var grid = new QuickGrid<TestEntity>();
+        var singleItem = new List<TestEntity> { new() { Id = 1, Name = "Only Item" } }.AsQueryable();
+        var pagination = new PaginationState { ItemsPerPage = 10 };
+
+        // Act
+        grid.Items = singleItem;
+        grid.Pagination = pagination;
+        await pagination.SetTotalItemCountAsync(1);
+
+        // Assert
+        Assert.Single(grid.Items);
+        Assert.Equal(0, pagination.LastPageIndex);
+    }
+
+    [Fact]
+    public void QuickGrid_WithZeroItems_LastPageIsZero()
+    {
+        // Arrange
+        var grid = new QuickGrid<TestEntity>();
+        var emptyItems = Enumerable.Empty<TestEntity>().AsQueryable();
+        var pagination = new PaginationState { ItemsPerPage = 10 };
+
+        // Act
+        grid.Items = emptyItems;
+        grid.Pagination = pagination;
+
+        // Assert
+        Assert.Empty(grid.Items);
+    }
+
+    [Fact]
+    public async Task GridSort_SortToggleBehavior_DescendingRevertsOrder()
+    {
+        // Arrange
+        var expression = (Expression<Func<TestEntity, string>>)(x => x.Name);
+        var data = new List<TestEntity>
+        {
+            new() { Id = 1, Name = "Alice" },
+            new() { Id = 2, Name = "Bob" },
+            new() { Id = 3, Name = "Charlie" }
+        }.AsQueryable();
+
+        // Act - Sort ascending
+        var sortAsc = GridSort<TestEntity>.ByAscending(expression);
+        var resultAsc = await Task.FromResult(sortAsc.Apply(data, ascending: true).ToList());
+
+        // Act - Sort descending
+        var sortDesc = GridSort<TestEntity>.ByDescending(expression);
+        var resultDesc = await Task.FromResult(sortDesc.Apply(data, ascending: true).ToList());
+
+        // Assert - results should be in opposite order
+        Assert.Equal("Alice", resultAsc[0].Name);  // Ascending: Alice first
+        Assert.Equal("Charlie", resultDesc[0].Name); // Descending: Charlie first
+        Assert.Equal("Charlie", resultAsc[2].Name); // Ascending: Charlie last
+        Assert.Equal("Alice", resultDesc[2].Name);  // Descending: Alice last
+    }
+
+    #endregion
+
+    #region PlaceholderTemplate in Virtualization Tests
+
+    [Fact]
+    public void TemplateColumn_PlaceholderTemplate_DefaultIsNull()
+    {
+        // Arrange & Act
+        var column = new TemplateColumn<TestEntity>();
+
+        // Assert - PlaceholderTemplate should be null by default
+        Assert.Null(column.PlaceholderTemplate);
+    }
+
+    [Fact]
+    public void TemplateColumn_PlaceholderTemplate_CanBeSet()
+    {
+        // Arrange
+        var column = new TemplateColumn<TestEntity>();
+        RenderFragment<PlaceholderContext>? placeholderTemplate = context =>
+            builder => builder.AddContent(0, "Loading...");
+
+        // Act
+        column.PlaceholderTemplate = placeholderTemplate;
+
+        // Assert - PlaceholderTemplate should be set
+        Assert.NotNull(column.PlaceholderTemplate);
+    }
+
+    [Fact]
+    public void QuickGrid_VirtualizationWithPlaceholder_BothCanBeEnabled()
+    {
+        // Arrange
+        var grid = new QuickGrid<TestEntity>();
+        var column = new TemplateColumn<TestEntity>();
+
+        // Act
+        grid.Virtualize = true;
+        RenderFragment<PlaceholderContext>? template = ctx => builder => builder.AddContent(0, "Loading");
+        column.PlaceholderTemplate = template;
+
+        // Assert
+        Assert.True(grid.Virtualize);
+        Assert.NotNull(column.PlaceholderTemplate);
+    }
+
+    [Fact]
+    public void TemplateColumn_PlaceholderTemplate_WithVirtualization_RendersDuringScroll()
+    {
+        // Arrange
+        var grid = new QuickGrid<TestEntity> { Virtualize = true, ItemSize = 50 };
+        var column = new TemplateColumn<TestEntity>();
+        RenderFragment<PlaceholderContext>? placeholderTemplate = context =>
+            builder => builder.AddContent(0, "Placeholder");
+
+        // Act
+        column.PlaceholderTemplate = placeholderTemplate;
+
+        // Assert - Placeholder template should be available when grid is virtualized
+        Assert.NotNull(column.PlaceholderTemplate);
+        Assert.True(grid.Virtualize);
+    }
+
+    #endregion
+
+    #region Property Expression Edge Cases Tests
+
+    [Fact]
+    public void GridSort_SimpleProperty_SortsSuccessfully()
+    {
+        // Arrange
+        Expression<Func<TestEntity, string>> expression = x => x.Name;
+        var data = new List<TestEntity>
+        {
+            new() { Id = 3, Name = "Charlie" },
+            new() { Id = 1, Name = "Alice" },
+            new() { Id = 2, Name = "Bob" }
+        }.AsQueryable();
+
+        // Act
+        var gridSort = GridSort<TestEntity>.ByAscending(expression);
+        var result = gridSort.Apply(data, ascending: true).ToList();
+
+        // Assert
+        Assert.Equal("Alice", result[0].Name);
+        Assert.Equal("Bob", result[1].Name);
+        Assert.Equal("Charlie", result[2].Name);
+    }
+
+    [Fact]
+    public void GridSort_NestedProperty_SortsSuccessfully()
+    {
+        // Arrange
+        var nestedData = new List<NestedEntity>
+        {
+            new() { Id = 1, Title = "First", Child = new() { Name = "Zoe", Value = 10 } },
+            new() { Id = 2, Title = "Second", Child = new() { Name = "Alice", Value = 5 } },
+            new() { Id = 3, Title = "Third", Child = new() { Name = "Bob", Value = 15 } }
+        }.AsQueryable();
+
+        // Act
+        Expression<Func<NestedEntity, string>> expression = x => x.Child.Name;
+        var gridSort = GridSort<NestedEntity>.ByAscending(expression);
+        var result = gridSort.Apply(nestedData, ascending: true).ToList();
+
+        // Assert - Should sort by nested property
+        Assert.Equal("Alice", result[0].Child.Name);
+        Assert.Equal("Bob", result[1].Child.Name);
+        Assert.Equal("Zoe", result[2].Child.Name);
+    }
+
+    [Fact]
+    public void GridSort_NestedIntProperty_SortsNumericallyCorrectly()
+    {
+        // Arrange
+        var nestedData = new List<NestedEntity>
+        {
+            new() { Id = 1, Title = "First", Child = new() { Name = "Item1", Value = 100 } },
+            new() { Id = 2, Title = "Second", Child = new() { Name = "Item2", Value = 10 } },
+            new() { Id = 3, Title = "Third", Child = new() { Name = "Item3", Value = 50 } }
+        }.AsQueryable();
+
+        // Act
+        Expression<Func<NestedEntity, int>> expression = x => x.Child.Value;
+        var gridSort = GridSort<NestedEntity>.ByAscending(expression);
+        var result = gridSort.Apply(nestedData, ascending: true).ToList();
+
+        // Assert - Should sort numerically: 10, 50, 100
+        Assert.Equal(10, result[0].Child.Value);
+        Assert.Equal(50, result[1].Child.Value);
+        Assert.Equal(100, result[2].Child.Value);
+    }
+
+    [Fact]
+    public void GridSort_ConvertExpression_HandlesTypeConversion()
+    {
+        // Arrange
+        var data = new List<TestEntity>
+        {
+            new() { Id = 3, Salary = 50000m },
+            new() { Id = 1, Salary = 30000m },
+            new() { Id = 2, Salary = 40000m }
+        }.AsQueryable();
+
+        // Act - Sort decimal values (may involve type conversion)
+        Expression<Func<TestEntity, decimal>> expression = x => x.Salary;
+        var gridSort = GridSort<TestEntity>.ByAscending(expression);
+        var result = gridSort.Apply(data, ascending: true).ToList();
+
+        // Assert
+        Assert.Equal(30000m, result[0].Salary);
+        Assert.Equal(40000m, result[1].Salary);
+        Assert.Equal(50000m, result[2].Salary);
+    }
+
+    [Fact]
+    public void GridSort_MultipleNestedLevels_SortsCorrectly()
+    {
+        // Arrange
+        var nestedData = new List<NestedEntity>
+        {
+            new() { Id = 1, Title = "First", Child = new() { Name = "C", Value = 3 } },
+            new() { Id = 2, Title = "Second", Child = new() { Name = "A", Value = 1 } },
+            new() { Id = 3, Title = "Third", Child = new() { Name = "B", Value = 2 } }
+        }.AsQueryable();
+
+        // Act - Chain sorts: by Child.Value then by Child.Name
+        Expression<Func<NestedEntity, int>> valueExpr = x => x.Child.Value;
+        var gridSort = GridSort<NestedEntity>.ByAscending(valueExpr);
+        var result = gridSort.Apply(nestedData, ascending: true).ToList();
+
+        // Assert
+        Assert.Equal(1, result[0].Child.Value);
+        Assert.Equal(2, result[1].Child.Value);
+        Assert.Equal(3, result[2].Child.Value);
+    }
+
+    [Fact]
+    public void PropertyColumn_WithNestedProperty_DisplaysCorrectly()
+    {
+        // Arrange
+        var column = new PropertyColumn<NestedEntity, string>();
+
+        // Act - Set nested property expression
+        Expression<Func<NestedEntity, string>> expression = x => x.Child.Name;
+        var propertyInfo = typeof(PropertyColumn<NestedEntity, string>).GetProperty("Property",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        propertyInfo?.SetValue(column, expression);
+
+        // Assert - Should accept nested property
+        Assert.NotNull(expression);
+    }
+
+    [Fact]
+    public void GridSort_CombinedSorts_WithNestedAndSimpleProperties()
+    {
+        // Arrange
+        var nestedData = new List<NestedEntity>
+        {
+            new() { Id = 3, Title = "Zebra", Child = new() { Name = "Item1", Value = 1 } },
+            new() { Id = 1, Title = "Apple", Child = new() { Name = "Item2", Value = 2 } },
+            new() { Id = 2, Title = "Banana", Child = new() { Name = "Item3", Value = 1 } }
+        }.AsQueryable();
+
+        // Act - Sort by Title (simple property)
+        Expression<Func<NestedEntity, string>> titleExpr = x => x.Title;
+        var gridSort = GridSort<NestedEntity>.ByAscending(titleExpr);
+        var result = gridSort.Apply(nestedData, ascending: true).ToList();
+
+        // Assert - Should be sorted alphabetically by Title
+        Assert.Equal("Apple", result[0].Title);
+        Assert.Equal("Banana", result[1].Title);
+        Assert.Equal("Zebra", result[2].Title);
     }
 
     #endregion

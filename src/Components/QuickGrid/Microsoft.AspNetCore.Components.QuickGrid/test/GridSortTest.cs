@@ -25,7 +25,7 @@ public class GridSortTest
     }
 
     [Fact]
-    public void ToPropertyName_SimpleProperty_ReturnsPropertyName()
+    public void ToPropertyList_SimpleProperty_ReturnsCorrectPropertyName()
     {
         // Arrange
         Expression<Func<TestEntity, string>> expression = x => x.Name;
@@ -41,7 +41,7 @@ public class GridSortTest
     }
 
     [Fact]
-    public void ToPropertyName_NullableProperty_ReturnsPropertyName()
+    public void ToPropertyList_NullableProperty_ReturnsCorrectPropertyName()
     {
         // Arrange
         Expression<Func<TestEntity, DateTime?>> expression = x => x.NullableDate;
@@ -337,7 +337,7 @@ public class GridSortTest
     }
 
     [Fact]
-    public void Apply_WithDescendingInitialSort_AppliesCorrectly()
+    public void Apply_WithDescendingInitialSort_FlipsSortDirection()
     {
         // Arrange
         Expression<Func<TestEntity, string>> expression = x => x.Name;

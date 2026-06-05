@@ -32,7 +32,7 @@ public class TemplateColumnTest
     }
 
     [Fact]
-    public void TemplateColumn_SortBy_WhenNull_IsNotSortableByDefault()
+    public void TemplateColumn_SortBy_WhenNull_IsNotSortable()
     {
         // Arrange
         var column = new TemplateColumn<TestEntity>();
@@ -191,7 +191,7 @@ public class TemplateColumnTest
     }
 
     [Fact]
-    public void TemplateColumn_MultipleSortBy_Chained()
+    public void TemplateColumn_MultipleSortBy_Chained_HandlesCorrectly()
     {
         // Arrange
         var column = new TemplateColumn<TestEntity>();
