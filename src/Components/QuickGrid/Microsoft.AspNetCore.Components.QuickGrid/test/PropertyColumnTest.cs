@@ -8,6 +8,10 @@ using Microsoft.AspNetCore.Components.Rendering;
 
 namespace Microsoft.AspNetCore.Components.QuickGrid.Tests;
 
+/// <summary>
+/// Tests for PropertyColumn component including property expression handling,
+/// format string support, auto-generated titles, and sorting behavior.
+/// </summary>
 public class PropertyColumnTest
 {
     private class TestEntity

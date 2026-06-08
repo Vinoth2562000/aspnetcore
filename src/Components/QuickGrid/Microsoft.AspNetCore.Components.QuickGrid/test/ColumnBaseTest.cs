@@ -9,6 +9,10 @@ using Microsoft.AspNetCore.Components.Web.Virtualization;
 
 namespace Microsoft.AspNetCore.Components.QuickGrid.Tests;
 
+/// <summary>
+/// Tests for ColumnBase base class functionality including property defaults,
+/// alignment options, header templates, and column options support.
+/// </summary>
 public class ColumnBaseTest
 {
     private class TestEntity

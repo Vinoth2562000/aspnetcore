@@ -7,6 +7,10 @@ using Microsoft.AspNetCore.Components.QuickGrid.Infrastructure;
 
 namespace Microsoft.AspNetCore.Components.QuickGrid.Tests;
 
+/// <summary>
+/// Tests for TemplateColumn component including child content rendering,
+/// sort expression support, header templates, and placeholder templates.
+/// </summary>
 public class TemplateColumnTest
 {
     private class TestEntity

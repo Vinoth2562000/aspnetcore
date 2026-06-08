@@ -6,6 +6,10 @@ using Microsoft.AspNetCore.Components;
 
 namespace Microsoft.AspNetCore.Components.QuickGrid.Tests;
 
+/// <summary>
+/// Tests for PaginationState functionality including page navigation,
+/// TotalItemCount tracking, LastPageIndex calculation, and event handling.
+/// </summary>
 public class PaginationStateTest
 {
     [Fact]

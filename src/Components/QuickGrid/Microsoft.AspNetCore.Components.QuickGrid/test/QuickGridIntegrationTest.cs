@@ -8,6 +8,10 @@ using Microsoft.AspNetCore.Components.QuickGrid.Infrastructure;
 
 namespace Microsoft.AspNetCore.Components.QuickGrid.Tests;
 
+/// <summary>
+/// Integration tests for QuickGrid component covering public API contracts,
+/// Items/ItemsProvider conflict detection, and property defaults.
+/// </summary>
 public class QuickGridIntegrationTest
 {
     private class TestEntity
@@ -124,7 +128,7 @@ public class QuickGridIntegrationTest
     }
 
     [Fact]
-    public void QuickGrid_Theme_DefaultValue()
+    public void QuickGrid_Theme_DefaultValue_IsDefault()
     {
         // Arrange
         var grid = new QuickGrid<TestEntity>();
