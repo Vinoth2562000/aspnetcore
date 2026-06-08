@@ -6,10 +6,6 @@ using System.Linq.Expressions;
 
 namespace Microsoft.AspNetCore.Components.QuickGrid.Tests;
 
-/// <summary>
-/// Tests for GridSort functionality including sorting expressions,
-/// direction toggling, property name resolution, and caching behavior.
-/// </summary>
 public class GridSortTest
 {
     // Test model classes
