@@ -25,7 +25,7 @@ public class GridSortTest
     }
 
     [Fact]
-    public void ToPropertyList_SimpleProperty_ReturnsCorrectPropertyName()
+    public void ToPropertyName_SimpleProperty_ReturnsPropertyName()
     {
         // Arrange
         Expression<Func<TestEntity, string>> expression = x => x.Name;
@@ -41,7 +41,7 @@ public class GridSortTest
     }
 
     [Fact]
-    public void ToPropertyList_NullableProperty_ReturnsCorrectPropertyName()
+    public void ToPropertyName_NullableProperty_ReturnsPropertyName()
     {
         // Arrange
         Expression<Func<TestEntity, DateTime?>> expression = x => x.NullableDate;
@@ -57,7 +57,7 @@ public class GridSortTest
     }
 
     [Fact]
-    public void ToPropertyList_NullableInt_ReturnsCorrectPropertyName()
+    public void ToPropertyName_NullableInt_ReturnsPropertyName()
     {
         // Arrange
         Expression<Func<TestEntity, int?>> expression = x => x.NullableInt;
@@ -73,7 +73,7 @@ public class GridSortTest
     }
 
     [Fact]
-    public void ToPropertyList_NestedProperty_ReturnsNestedPropertyName()
+    public void ToPropertyName_NestedProperty_ReturnsNestedPropertyName()
     {
         // Arrange
         Expression<Func<TestEntity, string>> expression = x => x.Child.ChildName;
@@ -89,7 +89,7 @@ public class GridSortTest
     }
 
     [Fact]
-    public void ToPropertyList_NestedNullableProperty_ReturnsNestedPropertyName()
+    public void ToPropertyName_NestedNullableProperty_ReturnsNestedPropertyName()
     {
         // Arrange
         Expression<Func<TestEntity, DateTime?>> expression = x => x.Child.ChildNullableDate;
@@ -105,7 +105,7 @@ public class GridSortTest
     }
 
     [Fact]
-    public void ToPropertyList_DescendingSort_ReturnsCorrectDirection()
+    public void ToPropertyName_DescendingSort_ReturnsCorrectDirection()
     {
         // Arrange
         Expression<Func<TestEntity, DateTime?>> expression = x => x.NullableDate;
@@ -121,7 +121,7 @@ public class GridSortTest
     }
 
     [Fact]
-    public void ToPropertyList_MultipleSort_ReturnsAllProperties()
+    public void ToPropertyName_MultipleSort_ReturnsAllProperties()
     {
         // Arrange
         Expression<Func<TestEntity, string>> firstExpression = x => x.Name;
@@ -145,7 +145,7 @@ public class GridSortTest
     }
 
     [Fact]
-    public void ToPropertyList_InvalidExpression_ThrowsArgumentException()
+    public void ToPropertyName_InvalidExpression_ThrowsArgumentException()
     {
         // Arrange
         Expression<Func<TestEntity, string>> invalidExpression = x => x.Name.ToUpper(CultureInfo.InvariantCulture);
@@ -157,7 +157,7 @@ public class GridSortTest
     }
 
     [Fact]
-    public void ToPropertyList_MethodCallExpression_ThrowsArgumentException()
+    public void ToPropertyName_MethodCallExpression_ThrowsArgumentException()
     {
         // Arrange
         Expression<Func<TestEntity, string>> invalidExpression = x => x.Name.Substring(0, 1);
@@ -169,7 +169,7 @@ public class GridSortTest
     }
 
     [Fact]
-    public void ToPropertyList_ConstantExpression_ThrowsArgumentException()
+    public void ToPropertyName_ConstantExpression_ThrowsArgumentException()
     {
         // Arrange
         Expression<Func<TestEntity, string>> invalidExpression = x => "constant";
