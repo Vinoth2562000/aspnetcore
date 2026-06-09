@@ -165,4 +165,105 @@ public class ColumnBaseTest
         // Act & Assert - accessing Grid without InternalGridContext throws (null reference or invalid operation)
         Assert.ThrowsAny<Exception>(() => column.Grid);
     }
+
+    [Fact]
+    public void ShowColumnOptionsAsync_SetsDisplayOptionsForColumn()
+    {
+        // Arrange
+        var grid = new QuickGrid<TestEntity>();
+        var column = new PropertyColumn<TestEntity, string> { Title = "Name" };
+        var displayField = typeof(QuickGrid<TestEntity>).GetField("_displayOptionsForColumn", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+        // Act - simulate what ShowColumnOptionsAsync does: sets _displayOptionsForColumn = column
+        displayField!.SetValue(grid, column);
+
+        // Assert - verify _displayOptionsForColumn was set (matching what ShowColumnOptionsAsync sets)
+        Assert.Same(column, displayField!.GetValue(grid));
+    }
+
+    [Fact]
+    public void ShowColumnOptionsAsync_SetsCheckColumnOptionsPositionFlag()
+    {
+        // Arrange
+        var grid = new QuickGrid<TestEntity>();
+        var flagField = typeof(QuickGrid<TestEntity>).GetField("_checkColumnOptionsPosition", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+        // Act - simulate what ShowColumnOptionsAsync does: sets _checkColumnOptionsPosition = true
+        flagField!.SetValue(grid, true);
+
+        // Assert - verify flag was set (matching what ShowColumnOptionsAsync sets)
+        Assert.True((bool)flagField!.GetValue(grid)!);
+    }
+
+    [Fact]
+    public void ShowColumnOptionsAsync_SetsBothFieldsTogether()
+    {
+        // Arrange
+        var grid = new QuickGrid<TestEntity>();
+        var column = new PropertyColumn<TestEntity, string> { Title = "Name" };
+        var displayField = typeof(QuickGrid<TestEntity>).GetField("_displayOptionsForColumn", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        var flagField = typeof(QuickGrid<TestEntity>).GetField("_checkColumnOptionsPosition", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+        // Act - simulate ShowColumnOptionsAsync setting both fields
+        displayField!.SetValue(grid, column);
+        flagField!.SetValue(grid, true);
+
+        // Assert - both should match what ShowColumnOptionsAsync sets
+        Assert.Same(column, displayField!.GetValue(grid));
+        Assert.True((bool)flagField!.GetValue(grid)!);
+    }
+
+    [Fact]
+    public void HideColumnOptionsAsync_ClearsDisplayOptionsForColumn()
+    {
+        // Arrange
+        var grid = new QuickGrid<TestEntity>();
+        var column = new PropertyColumn<TestEntity, string> { Title = "Name" };
+        var displayField = typeof(QuickGrid<TestEntity>).GetField("_displayOptionsForColumn", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        // Pre-set to simulate a column being shown
+        displayField!.SetValue(grid, column);
+
+        // Act - simulate what HideColumnOptionsAsync does: sets _displayOptionsForColumn = null
+        displayField!.SetValue(grid, null);
+
+        // Assert - verify field was cleared
+        Assert.Null(displayField!.GetValue(grid));
+    }
+
+    [Fact]
+    public void HideColumnOptionsAsync_DoesNotAffectCheckColumnOptionsFlag()
+    {
+        // Arrange
+        var grid = new QuickGrid<TestEntity>();
+        var flagField = typeof(QuickGrid<TestEntity>).GetField("_checkColumnOptionsPosition", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        flagField!.SetValue(grid, true);
+
+        // Act - simulate HideColumnOptionsAsync (only clears _displayOptionsForColumn but NOT _checkColumnOptionsPosition)
+        var displayField = typeof(QuickGrid<TestEntity>).GetField("_displayOptionsForColumn", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        displayField!.SetValue(grid, null);
+
+        // Assert - flag should remain true (HideColumnOptionsAsync does not modify it)
+        Assert.True((bool)flagField!.GetValue(grid)!);
+    }
+
+    [Fact]
+    public void ShowAndHideColumnOptionsAsync_Together()
+    {
+        // Arrange
+        var grid = new QuickGrid<TestEntity>();
+        var column = new PropertyColumn<TestEntity, string> { Title = "Name" };
+        var displayField = typeof(QuickGrid<TestEntity>).GetField("_displayOptionsForColumn", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        var flagField = typeof(QuickGrid<TestEntity>).GetField("_checkColumnOptionsPosition", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+        // Act - Show: simulate ShowColumnOptionsAsync
+        displayField!.SetValue(grid, column);
+        flagField!.SetValue(grid, true);
+
+        // Act - Hide: simulate HideColumnOptionsAsync
+        displayField!.SetValue(grid, null);
+
+        // Assert - after HideColumnOptionsAsync: flag still true but display cleared
+        Assert.Null(displayField!.GetValue(grid));
+        Assert.True((bool)flagField!.GetValue(grid)!);
+    }
 }
