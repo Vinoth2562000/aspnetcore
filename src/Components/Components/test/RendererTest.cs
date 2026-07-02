@@ -2214,6 +2214,73 @@ public class RendererTest
     }
 
     [Fact]
+    public void RemovesSplatAttributeFromChildElementWhenOmittedOnSubsequentRender()
+    {
+        var renderer = new TestRenderer();
+        var includeAttribute = true;
+        var component = new TestComponent(builder =>
+        {
+            builder.OpenComponent<MyStrongComponent>(1);
+            builder.AddComponentParameter(2, nameof(MyStrongComponent.Text), "hi there.");
+            if (includeAttribute)
+            {
+                builder.AddAttribute(10, "class", "example-class");
+            }
+            builder.CloseComponent();
+        });
+
+        renderer.AssignRootComponentId(component);
+        component.TriggerRender();
+
+        var childComponentId = renderer.Batches.Single()
+            .ReferenceFrames
+            .Single(frame => frame.FrameType == RenderTreeFrameType.Component)
+            .ComponentId;
+
+        includeAttribute = false;
+        component.TriggerRender();
+
+        var childDiff = renderer.Batches[1].DiffsByComponentId[childComponentId].Single();
+        Assert.Contains(childDiff.Edits, edit =>
+            edit.Type == RenderTreeEditType.RemoveAttribute && edit.RemovedAttributeName == "class");
+    }
+
+    [Fact]
+    public void RemovesOnlyOmittedUnmatchedAttributesFromChildElement()
+    {
+        var renderer = new TestRenderer();
+        var includeSecondAttribute = true;
+        var component = new TestComponent(builder =>
+        {
+            builder.OpenComponent<MyStrongComponent>(1);
+            builder.AddComponentParameter(2, nameof(MyStrongComponent.Text), "hi there.");
+            builder.AddAttribute(10, "data-test-1", "value1");
+            if (includeSecondAttribute)
+            {
+                builder.AddAttribute(11, "data-test-2", "value2");
+            }
+            builder.CloseComponent();
+        });
+
+        renderer.AssignRootComponentId(component);
+        component.TriggerRender();
+
+        var childComponentId = renderer.Batches.Single()
+            .ReferenceFrames
+            .Single(frame => frame.FrameType == RenderTreeFrameType.Component)
+            .ComponentId;
+
+        includeSecondAttribute = false;
+        component.TriggerRender();
+
+        var childDiff = renderer.Batches[1].DiffsByComponentId[childComponentId].Single();
+        Assert.Contains(childDiff.Edits, edit =>
+            edit.Type == RenderTreeEditType.RemoveAttribute && edit.RemovedAttributeName == "data-test-2");
+        Assert.DoesNotContain(childDiff.Edits, edit =>
+            edit.Type == RenderTreeEditType.RemoveAttribute && edit.RemovedAttributeName == "data-test-1");
+    }
+
+    [Fact]
     public void RenderBatchIncludesListOfDisposedComponents()
     {
         // Arrange

@@ -366,6 +366,40 @@ public partial class ParameterViewTest
     }
 
     [Fact]
+    public void CaptureUnmatchedValues_IsResetToNull_WhenNoUnmatchedValuesAreSupplied()
+    {
+        var target = new HasCaptureUnmatchedValuesProperty
+        {
+            CaptureUnmatchedValues = new Dictionary<string, object> { { "old", "value" } }
+        };
+        var parameters = new ParameterViewBuilder
+        {
+            { nameof(HasCaptureUnmatchedValuesProperty.StringProp), "hi" },
+        }.Build();
+
+        parameters.SetParameterProperties(target);
+
+        Assert.Equal("hi", target.StringProp);
+        Assert.Null(target.CaptureUnmatchedValues);
+    }
+
+    [Fact]
+    public void CaptureUnmatchedValues_RemainsNull_AfterSecondRenderWithNoUnmatchedValues()
+    {
+        var target = new HasCaptureUnmatchedValuesProperty();
+        var parametersWithNoUnmatched = new ParameterViewBuilder
+        {
+            { nameof(HasCaptureUnmatchedValuesProperty.StringProp), "hi" },
+        }.Build();
+
+        parametersWithNoUnmatched.SetParameterProperties(target);
+        parametersWithNoUnmatched.SetParameterProperties(target);
+
+        Assert.Equal("hi", target.StringProp);
+        Assert.Null(target.CaptureUnmatchedValues);
+    }
+
+    [Fact]
     public void SettingCaptureUnmatchedValuesParameterExplicitlyAndImplicitly_Throws()
     {
         // Arrange
