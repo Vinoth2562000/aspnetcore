@@ -186,9 +186,26 @@ internal partial class CircuitHost : IAsyncDisposable
                 // Report errors asynchronously. InitializeAsync is designed not to throw.
                 Log.InitializationFailed(_logger, ex);
                 UnhandledException?.Invoke(this, new UnhandledExceptionEventArgs(ex, isTerminating: false));
-                await TryNotifyClientErrorAsync(Client, GetClientErrorMessage(ex), ex);
+                await TryNotifyClientErrorAsync(Client, GetClientInitializationErrorMessage(ex), ex);
             }
         }));
+    }
+
+    // Initialization-time errors are *always* developer errors (the component failed to even
+    // start), so we always include the exception message in the error sent to the client
+    // even when DetailedErrors is disabled. Without this, a missing service in a no-prerender
+    // interactive component silently fails to render with no useful feedback (see #52598).
+    private string GetClientInitializationErrorMessage(Exception exception)
+    {
+        if (_options.DetailedErrors)
+        {
+            return exception.ToString();
+        }
+
+        return $"There was an error initializing the circuit. The underlying exception of type " +
+            $"'{exception.GetType().FullName}' was: {exception.Message} " +
+            $"For more details turn on detailed exceptions by setting 'DetailedErrors: true' in " +
+            $"'appSettings.Development.json' or set '{typeof(CircuitOptions).Name}.{nameof(CircuitOptions.DetailedErrors)}'.";
     }
 
     // We handle errors in DisposeAsync because there's no real value in letting it propagate.
@@ -1039,7 +1056,7 @@ internal partial class CircuitHost : IAsyncDisposable
         [LoggerMessage(101, LogLevel.Debug, "Circuit initialization succeeded.", EventName = "InitializationSucceeded")]
         public static partial void InitializationSucceeded(ILogger logger);
 
-        [LoggerMessage(102, LogLevel.Debug, "Circuit initialization failed.", EventName = "InitializationFailed")]
+        [LoggerMessage(102, LogLevel.Error, "Circuit initialization failed.", EventName = "InitializationFailed")]
         public static partial void InitializationFailed(ILogger logger, Exception exception);
 
         [LoggerMessage(103, LogLevel.Debug, "Disposing circuit '{CircuitId}' started.", EventName = "DisposeStarted")]

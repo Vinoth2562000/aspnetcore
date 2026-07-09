@@ -1,6 +1,7 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Reflection;
@@ -10,7 +11,9 @@ using Microsoft.AspNetCore.Components.Rendering;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Options;
 using Microsoft.JSInterop;
 using Moq;
@@ -285,6 +288,87 @@ public class CircuitHostTest
         var aex = Assert.IsType<AggregateException>(reportedErrors.Single().ExceptionObject);
         Assert.Same(ex, aex.InnerExceptions.Single());
         Assert.False(reportedErrors.Single().IsTerminating);
+    }
+
+    // Regression test for https://github.com/dotnet/aspnetcore/issues/52598:
+    // When component initialization throws (e.g. a missing DI service for an
+    // interactive component), the exception must be visible to the developer in
+    // both the server log and the browser, even when DetailedErrors is disabled.
+    [Fact]
+    public async Task InitializeAsync_WithFailedRootComponent_NotifiesClientWithExceptionMessage()
+    {
+        // Arrange: a component handler that throws during OnCircuitOpenedAsync.
+        // This drives the same catch block in InitializeAsync that catches a
+        // component-instantiation exception (missing DI service, etc.).
+        var expectedExceptionMessage = "No service for type 'Microsoft.AspNetCore.Components.Server.Circuits.Tests.MissingService' has been registered.";
+        var handler = new Mock<CircuitHandler>(MockBehavior.Strict);
+        SetupMockInboundActivityHandler(handler);
+        handler
+            .Setup(h => h.OnCircuitOpenedAsync(It.IsAny<Circuit>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException(expectedExceptionMessage))
+            .Verifiable();
+
+        var mockClientProxy = new Mock<ISingleClientProxy>();
+        mockClientProxy
+            .Setup(c => c.SendCoreAsync(It.IsAny<string>(), It.IsAny<object[]>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var client = new CircuitClientProxy(mockClientProxy.Object, "connection-id");
+        var circuitHost = TestCircuitHost.Create(
+            handlers: new[] { handler.Object },
+            descriptors: [new ComponentDescriptor()],
+            clientProxy: client);
+
+        // Act
+        await circuitHost.InitializeAsync(
+            new ProtectedPrerenderComponentApplicationStore(Mock.Of<IDataProtectionProvider>()),
+            default,
+            new CancellationToken());
+
+        // Assert: The exception message must be sent to the client (not just the
+        // generic "There was an unhandled exception on the current circuit" text)
+        // so that the developer can see which service is missing.
+        mockClientProxy.Verify(
+            c => c.SendCoreAsync(
+                "JS.Error",
+                It.Is<object[]>(args => IsInitializationErrorMessage(args, expectedExceptionMessage)),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    // Regression test for https://github.com/dotnet/aspnetcore/issues/52598:
+    // The exception is logged at Error level (not Debug) so it is visible by
+    // default in the server console.
+    [Fact]
+    public async Task InitializeAsync_WithFailedRootComponent_LogsAtErrorLevel()
+    {
+        // Arrange
+        var handler = new Mock<CircuitHandler>(MockBehavior.Strict);
+        SetupMockInboundActivityHandler(handler);
+        handler
+            .Setup(h => h.OnCircuitOpenedAsync(It.IsAny<Circuit>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Missing DI service for component"))
+            .Verifiable();
+
+        var observed = new List<(LogLevel LogLevel, EventId EventId)>();
+        var testSink = new TestSink(
+            (writeContext) => { observed.Add((writeContext.LogLevel, writeContext.EventId)); return true; },
+            (beginScope) => true);
+        var loggerFactory = new TestLoggerFactory(testSink, enabled: true);
+
+        var circuitHost = TestCircuitHost.Create(
+            handlers: new[] { handler.Object },
+            descriptors: [new ComponentDescriptor()],
+            logger: loggerFactory.CreateLogger<CircuitHost>());
+
+        // Act
+        await circuitHost.InitializeAsync(
+            new ProtectedPrerenderComponentApplicationStore(Mock.Of<IDataProtectionProvider>()),
+            default,
+            new CancellationToken());
+
+        // Assert: EventId 102 ("Circuit initialization failed") is logged at Error.
+        Assert.Contains(observed, entry => entry.EventId.Id == 102 && entry.LogLevel == LogLevel.Error);
     }
 
     [Fact]
@@ -1401,6 +1485,18 @@ public class CircuitHostTest
                 .Returns((Func<CircuitInboundActivityContext, Task> next) => next)
                 .Verifiable();
         }
+    }
+
+    // Helper for issue #52598 regression test. Moq's It.Is<T> requires a
+    // lambda that is convertible to an Expression tree, so we cannot use
+    // the `is X` pattern-matching operator inside it. This helper avoids
+    // that constraint by extracting the predicate into a regular method.
+    private static bool IsInitializationErrorMessage(object[] args, string expectedExceptionMessage)
+    {
+        return args.Length == 1
+            && args[0] is string message
+            && message.Contains(expectedExceptionMessage, StringComparison.Ordinal)
+            && message.Contains("There was an error initializing the circuit", StringComparison.Ordinal);
     }
 
     private static void SetupMockInboundActivityHandler(Mock<CircuitHandler> circuitHandler)
