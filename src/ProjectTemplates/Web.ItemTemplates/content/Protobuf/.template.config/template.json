@@ -15,7 +15,7 @@
   "groupIdentity": "Microsoft.Web.Grpc.Protobuf",
   "precedence": "11000",
   "identity": "Microsoft.Web.Grpc.Protobuf.11.0",
-  "shortname": "proto",
+  "shortName": "proto",
   "sourceName": "protobuf",
   "primaryOutputs": [
     {

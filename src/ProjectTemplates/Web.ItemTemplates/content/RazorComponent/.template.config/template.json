@@ -15,7 +15,7 @@
   "groupIdentity": "Microsoft.AspNetCore.Components.RazorComponent",
   "precedence": "11000",
   "identity": "Microsoft.AspNetCore.Components.RazorComponent.11.0",
-  "shortname": "razorcomponent",
+  "shortName": "razorcomponent",
   "sourceName": "Component1",
   "primaryOutputs": [
     {
