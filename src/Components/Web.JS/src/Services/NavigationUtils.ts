@@ -156,3 +156,9 @@ export function setHasInteractiveRouter(rendererId: WebRendererId) {
 
   interactiveRouterRendererId = rendererId;
 }
+
+export function clearHasInteractiveRouter(rendererId: WebRendererId) {
+  if (interactiveRouterRendererId === rendererId) {
+    interactiveRouterRendererId = undefined;
+  }
+}

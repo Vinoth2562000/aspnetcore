@@ -4,7 +4,7 @@
 import '@microsoft/dotnet-js-interop';
 import { scheduleScrollReset, ScrollResetSchedule } from '../Rendering/Renderer';
 import { EventDelegator } from '../Rendering/Events/EventDelegator';
-import { attachEnhancedNavigationListener, getInteractiveRouterRendererId, handleClickForNavigationInterception, hasInteractiveRouter, hasProgrammaticEnhancedNavigationHandler, isForSamePath, isSamePageWithHash, isWithinBaseUriSpace, performProgrammaticEnhancedNavigation, performScrollToElementOnTheSamePage, scrollToElement, setHasInteractiveRouter, toAbsoluteUri } from './NavigationUtils';
+import { attachEnhancedNavigationListener, getInteractiveRouterRendererId, handleClickForNavigationInterception, hasInteractiveRouter, hasProgrammaticEnhancedNavigationHandler, isForSamePath, isSamePageWithHash, isWithinBaseUriSpace, performProgrammaticEnhancedNavigation, performScrollToElementOnTheSamePage, scrollToElement, setHasInteractiveRouter, clearHasInteractiveRouter, toAbsoluteUri } from './NavigationUtils';
 import { WebRendererId } from '../Rendering/WebRendererId';
 import { isRendererAttached } from '../Rendering/WebRendererInteropMethods';
 import { IBlazor } from '../GlobalExports';
@@ -29,6 +29,7 @@ let resolveCurrentNavigation: ((shouldContinueNavigation: boolean) => void) | nu
 export const internalFunctions = {
   listenForNavigationEvents,
   enableNavigationInterception: setHasInteractiveRouter,
+  disableNavigationInterception: clearHasInteractiveRouter,
   setHasLocationChangingListeners,
   endLocationChanging,
   navigateTo: navigateToFromDotNet,

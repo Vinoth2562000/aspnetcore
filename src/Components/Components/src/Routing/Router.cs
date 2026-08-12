@@ -18,7 +18,7 @@ namespace Microsoft.AspNetCore.Components.Routing;
 /// <summary>
 /// A component that supplies route data corresponding to the current navigation state.
 /// </summary>
-public partial class Router : IComponent, IHandleAfterRender, IDisposable
+public partial class Router : IComponent, IHandleAfterRender, IDisposable, IAsyncDisposable
 {
     // Dictionary is intentionally used instead of ReadOnlyDictionary to reduce Blazor size
     static readonly IReadOnlyDictionary<string, object> _emptyParametersDictionary
@@ -182,6 +182,28 @@ public partial class Router : IComponent, IHandleAfterRender, IDisposable
         if (HotReloadManager.IsSupported)
         {
             HotReloadManager.Default.OnDeltaApplied -= ClearRouteCaches;
+        }
+
+        // Disable navigation interception if it was enabled
+        if (_navigationInterceptionEnabled)
+        {
+            _navigationInterceptionEnabled = false;
+            // Fire off the async operation without awaiting in sync Dispose
+            // The framework handles component lifecycle properly
+            _ = NavigationInterception.DisableNavigationInterceptionAsync();
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        Dispose();
+        
+        // If navigation interception was still enabled (shouldn't normally happen), ensure it's disabled
+        if (_navigationInterceptionEnabled)
+        {
+            _navigationInterceptionEnabled = false;
+            await NavigationInterception.DisableNavigationInterceptionAsync();
         }
     }
 

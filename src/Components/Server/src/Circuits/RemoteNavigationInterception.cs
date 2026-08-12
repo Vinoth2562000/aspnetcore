@@ -37,4 +37,17 @@ internal sealed class RemoteNavigationInterception : INavigationInterception
 
         await _jsRuntime.InvokeAsync<object>(Interop.EnableNavigationInterception, WebRendererId.Server);
     }
+
+    public async Task DisableNavigationInterceptionAsync()
+    {
+        if (!HasAttachedJSRuntime)
+        {
+            throw new InvalidOperationException("Navigation commands can not be issued at this time. This is because the component is being " +
+                "prerendered and the page has not yet loaded in the browser or because the circuit is currently disconnected. " +
+                "Components must wrap any navigation calls in conditional logic to ensure those navigation calls are not " +
+                "attempted during prerendering or while the client is disconnected.");
+        }
+
+        await _jsRuntime.InvokeAsync<object>(Interop.DisableNavigationInterception, WebRendererId.Server);
+    }
 }
