@@ -488,6 +488,64 @@ public class RouterTest
         Assert.Contains("No component found for route '/nonexistent-route'", exception.Message);
     }
 
+    [Fact]
+    public async Task Router_Dispose_DoesNotThrow()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<ILoggerFactory>(NullLoggerFactory.Instance);
+        services.AddSingleton<NavigationManager>(new TestNavigationManager());
+        services.AddSingleton<INavigationInterception, TestNavigationInterception>();
+        services.AddSingleton<IScrollToLocationHash, TestScrollToLocationHash>();
+
+        var serviceProvider = services.BuildServiceProvider();
+        var renderer = new TestRenderer(serviceProvider);
+        var router = (Router)renderer.InstantiateComponent<Router>();
+        router.AppAssembly = Assembly.GetExecutingAssembly();
+        router.Found = routeData => (builder) => { };
+        renderer.AssignRootComponentId(router);
+        router.Dispose();
+    }
+
+    [Fact]
+    public async Task Router_DisposeAsync_DoesNotThrow()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<ILoggerFactory>(NullLoggerFactory.Instance);
+        services.AddSingleton<NavigationManager>(new TestNavigationManager());
+        services.AddSingleton<INavigationInterception, TestNavigationInterception>();
+        services.AddSingleton<IScrollToLocationHash, TestScrollToLocationHash>();
+
+        var serviceProvider = services.BuildServiceProvider();
+        var renderer = new TestRenderer(serviceProvider);
+        var router = (Router)renderer.InstantiateComponent<Router>();
+        router.AppAssembly = Assembly.GetExecutingAssembly();
+        router.Found = routeData => (builder) => { };
+        renderer.AssignRootComponentId(router);
+
+        await router.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task Router_MultipleCalls_ToDisposeAreIdempotent()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<ILoggerFactory>(NullLoggerFactory.Instance);
+        services.AddSingleton<NavigationManager>(new TestNavigationManager());
+        services.AddSingleton<INavigationInterception, TestNavigationInterception>();
+        services.AddSingleton<IScrollToLocationHash, TestScrollToLocationHash>();
+
+        var serviceProvider = services.BuildServiceProvider();
+        var renderer = new TestRenderer(serviceProvider);
+        var router = (Router)renderer.InstantiateComponent<Router>();
+        router.AppAssembly = Assembly.GetExecutingAssembly();
+        router.Found = routeData => (builder) => { };
+        renderer.AssignRootComponentId(router);
+
+        router.Dispose();
+        router.Dispose();
+        router.Dispose();
+    }
+
     internal class TestNavigationManager : NavigationManager
     {
         public TestNavigationManager() =>
