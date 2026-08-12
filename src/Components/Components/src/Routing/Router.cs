@@ -184,12 +184,9 @@ public partial class Router : IComponent, IHandleAfterRender, IDisposable, IAsyn
             HotReloadManager.Default.OnDeltaApplied -= ClearRouteCaches;
         }
 
-        // Disable navigation interception if it was enabled
         if (_navigationInterceptionEnabled)
         {
             _navigationInterceptionEnabled = false;
-            // Fire off the async operation without awaiting in sync Dispose
-            // The framework handles component lifecycle properly
             _ = NavigationInterception.DisableNavigationInterceptionAsync();
         }
     }
@@ -198,8 +195,7 @@ public partial class Router : IComponent, IHandleAfterRender, IDisposable, IAsyn
     public async ValueTask DisposeAsync()
     {
         Dispose();
-        
-        // If navigation interception was still enabled (shouldn't normally happen), ensure it's disabled
+
         if (_navigationInterceptionEnabled)
         {
             _navigationInterceptionEnabled = false;
