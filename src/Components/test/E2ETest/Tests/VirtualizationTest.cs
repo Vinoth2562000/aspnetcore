@@ -6145,6 +6145,8 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
         SetScrollTargetIndex(150);
         Browser.Exists(By.Id("scroll-to-item")).Click();
         WaitForScrollStatus("Completed: 150");
+        Browser.True(() => GetTopRenderedIndex(js) == 150,
+            $"Top rendered item should be 150 before scrolling back to the top; topRendered={GetTopRenderedIndex(js)}, scrollTop={GetScrollTop(js, container)}");
 
         SetScrollTargetIndex(-1);
         Browser.Exists(By.Id("scroll-to-item")).Click();
