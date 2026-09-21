@@ -6349,11 +6349,11 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
         Browser.True(() => GetProviderEvents(js).Contains("p1-enter"));
         Browser.True(() => GetProviderEvents(js).Contains("scroll-start"));
 
-        // While call #1 is still blocked, perform a real user scroll far from row 800.
-        // The scroll event triggers spacer IO -> the fix cancels _currentScrollCts ->
+        // While call #1 is still blocked, perform a real user scroll to the top.
+        // The keyboard input re-arms spacer IO -> the fix cancels _currentScrollCts ->
         // call #1's WaitAsync(ct) throws OCE -> RefreshDataCoreAsync starts call #2 for
         // the user's window. The caller observes OperationCanceledException.
-        ScrollContainerWithWheelTo(js, container, 5000);
+        container.SendKeys(Keys.Home);
 
         Browser.True(() => GetProviderEvents(js).Contains("p1-cancel"));
         Browser.True(() => GetProviderCallIndex(js) >= 2);
@@ -6363,8 +6363,9 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
 
         // Release the gate. A user scroll typically triggers multiple RefreshDataCoreAsync
         // calls (one per spacer-IO callback), each superseding the previous _refreshCts.
-        // Whichever provider call is waiting on the current gate TCS at release time wakes up.
-        // We just need *some* later call to return so the final user-window items render.
+        // Disable the gate before releasing the waiting calls so a follow-up refresh cannot
+        // enter the replacement gate and leave the viewport showing placeholders.
+        Browser.Exists(By.Id("toggle-provider-gate")).Click();
         Browser.Exists(By.Id("release-provider-gate")).Click();
         Browser.True(() =>
         {
@@ -6387,7 +6388,7 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
         Assert.True(IndexOf(log, "p1-enter") < IndexOf(log, "p1-cancel"),
             $"p1-enter should precede p1-cancel; events={log}");
 
-        // Final viewport: the user scrolled near the top (~row 100), NOT row 800.
+        // Final viewport: the user scrolled to the top, NOT row 800.
         Browser.True(() =>
         {
             var top = GetTopRenderedIndex(js);
